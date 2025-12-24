@@ -1,4 +1,10 @@
-Name: OrangeFox - Build
+name: OrangeFox - Build
+
+# Credits to:
+# https://github.com/TeamWin
+# https://gitlab.com/OrangeFox
+# https://github.com/azwhikaru for Recovery Builder Template
+# And all Contributors in every repositories I used
 
 on:
   workflow_dispatch:
@@ -65,6 +71,7 @@ jobs:
         sudo bash setup/android_build_env.sh
       
     - name: Set-up Manifest
+      if: inputs.MANIFEST_BRANCH == '11.0' || inputs.MANIFEST_BRANCH == '12.1'
       run: |
         mkdir -p ${GITHUB_WORKSPACE}/OrangeFox
         cd ${GITHUB_WORKSPACE}/OrangeFox
@@ -74,33 +81,13 @@ jobs:
         cd sync
         ./orangefox_sync.sh --branch ${{ inputs.MANIFEST_BRANCH }} --path ${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}
 
-    - name: Set-up Local Manifest
+    - name: Clone LineageOS Kernel Source
       run: |
-        mkdir -p ${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}/.repo/local_manifests
-        cat <<EOF > ${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}/.repo/local_manifests/spacewar.xml
-        <?xml version="1.0" encoding="UTF-8"?>
-        <manifest>
-          <remote name="github" fetch="https://github.com/" />
-          
-          <project path="kernel/nothing/sm7325" 
-                   name="LineageOS/android_kernel_nothing_sm7325" 
-                   remote="github" 
-                   revision="lineage-23.0" />
-                   
-          <project path="vendor/qcom/opensource/commonsys-intf/display" 
-                   name="OrangeFoxRecovery/vendor_qcom_opensource_commonsys-intf_display" 
-                   remote="github" 
-                   revision="fox_12.1" />
-                   
-          <project path="hardware/nothing" 
-                   name="LineageOS/android_hardware_nothing" 
-                   remote="github" 
-                   revision="lineage-23.0" />
-        </manifest>
-        EOF
-        cd ${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}
-        repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
-
+        mkdir -p ${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}/kernel/nothing
+        cd ${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}/kernel/nothing
+        git clone https://github.com/LineageOS/android_kernel_nothing_sm7325.git -b lineage-23.0
+        echo "Kernel source cloned to: kernel/nothing/sm7325"
+    
     - name: Clone Device Tree
       run: |
         cd ${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}
@@ -121,6 +108,7 @@ jobs:
       run: |
         echo "BUILD_DATE=$(TZ=Asia/Manila date +%Y%m%d)" >> $GITHUB_ENV
         cd ${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}
+
         DEVICE_TREE_URL="${{ inputs.DEVICE_TREE }}"
         if [[ "${DEVICE_TREE_URL}" == *.git ]]; then
           DEVICE_TREE_URL="${DEVICE_TREE_URL%.git}"
@@ -137,6 +125,7 @@ jobs:
         tag_name: ${{ github.run_id }}
         body: |
           ## OrangeFox Recovery Build - Unofficial
-          - Manifest: fox_${{ inputs.MANIFEST_BRANCH }}
-          - Kernel: LineageOS 23.0 (sm7325)
-          - Device Tree: [${{ env.DEVICE_TREE_URL }}](${{ env.DEVICE_TREE_URL }}/tree/${{ inputs.DEVICE_TREE_BRANCH }})
+          Build: fox_${{ inputs.MANIFEST_BRANCH }}
+          Device: [Device Tree/Branch](${{ env.DEVICE_TREE_URL }}/tree/${{ inputs.DEVICE_TREE_BRANCH }})
+          Commit: Most recent [commit](${{ env.DEVICE_TREE_URL }}/commit/${{ env.COMMIT_ID }}) during building.
+          
